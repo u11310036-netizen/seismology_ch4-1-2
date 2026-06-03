@@ -1,18 +1,576 @@
-<div style="background-color: #0d1117; color: #c9d1d9; padding: 20px; border-radius: 8px; font-family: 'Fira Code', Consolas, 'Courier New', monospace; font-size: 14px; line-height: 1.6; text-align: left; overflow-x: auto; border: 1px solid #30363d; max-width: 100%; margin: 15px 0;">
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地震週期與斷層力學 - 互動式學習指南</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
     
-    <div style="color: #58a6ff; font-weight: bold; border-bottom: 1px solid #21262d; padding-bottom: 8px; margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">
-        📄 Python Source Code (GitHub Style)
-    </div>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; padding: 0; background-color: #020617; color: #f1f5f9; }
+        .mjx-chtml, .mjx-math, mjx-container, mjx-container * {
+            box-sizing: content-box !important;
+            border-width: initial !important;
+            border-style: initial !important;
+            border-color: initial !important;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(1.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-    <pre style="margin: 0; white-space: pre; font-family: inherit;"><span style="color: #ff7b72;">import</span> obspy
-<span style="color: #ff7b72;">from</span> obspy.imaging.beachball <span style="color: #ff7b72;">import</span> beachball
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-<span style="color: #8b949e;"># 定義矩張量數值</span>
-mt = [-<span style="color: #79c0ff;">2.39</span>, <span style="color: #79c0ff;">1.04</span>, <span style="color: #79c0ff;">1.35</span>, <span style="color: #79c0ff;">0.57</span>, -<span style="color: #79c0ff;">1.59</span>, -<span style="color: #79c0ff;">2.11</span>]
+        // --- Custom SVG Icons ---
+        const Activity = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>;
+        const Globe = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>;
+        const Box = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>;
+        const Target = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
+        const Sliders = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>;
+        const RotateCcw = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
+        const Layers = ({ size = 24, className = "" }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/></svg>;
 
-<span style="color: #79c0ff;">print</span>(<span style="color: #a5d6ff;">"數據載入成功。"</span>)</pre>
+        // --- MathJax Re-Typeset Hook ---
+        const useMathJax = (dependencies) => {
+            useEffect(() => {
+                const typeset = () => {
+                    if (window.MathJax && window.MathJax.typesetPromise) {
+                        window.MathJax.typesetPromise()
+                            .catch((err) => console.log('MathJax rendering failed: ', err));
+                    }
+                };
+                typeset();
+                const timer = setTimeout(typeset, 200); 
+                return () => clearTimeout(timer);
+            }, dependencies);
+        };
 
-    <div style="color: #8b949e; font-size: 11px; text-align: right; margin-top: 12px; border-top: 1px solid #21262d; padding-top: 6px; font-family: system-ui, -apple-system, sans-serif;">
-        Code source: GitHub • Clean HTML Mode
-    </div>
-</div>
+        // --- Tab Components ---
+
+        // 1. 基礎理論與地震週期
+        const TheorySection = () => {
+            const [activeStage, setActiveStage] = useState(0);
+            const stages = [
+                {
+                    title: "震間期 (Interseismic Stage)",
+                    desc: "佔據地震週期最長的時間（通常數十年至數千年）。在此階段，斷層面因強大摩擦力而被緊緊「鎖住」(Locked)，無法產生滑動；然而，板塊邊界遠處的構造地殼運動仍持續穩定進行，導致斷層帶周圍區域的彈性應變能無聲無息地持續累積，岩層逐漸發生顯著的剪切形變。",
+                    color: "bg-blue-500",
+                    stress: 30,
+                    highlight: "此階段是地表構造應變速率監測（如 GPS 觀測）的主要對象。"
+                },
+                {
+                    title: "震前期 (Preseismic Stage)",
+                    desc: "地震正式爆發前的短暫預備階段。此時局部應力已經極度逼近岩石的破裂臨界強度，摩擦強度開始軟化。微小的岩石破裂可能伴隨發生，部分地區會出現小規模的「前震 (Foreshocks)」，或者地表傾斜、地下水位與地球物理化學異常等微小形變與前兆效果。",
+                    color: "bg-yellow-500",
+                    stress: 85,
+                    highlight: "此階段的異常是科學家嘗試進行地震預報（Earthquake Prediction）的重要研究方向。"
+                },
+                {
+                    title: "震時相 (Coseismic Phase)",
+                    desc: "地震爆發的瞬間，斷層克服了極限靜摩擦力並發生劇烈的動態破裂與滑移。累積在岩體中的彈性應變能瞬間釋放，岩層快速「回跳」到較低的低應變狀態（部分釋放累積的彈性應變能）。釋放的應變能轉化為猛烈傳播的地震波，造成劇烈的地表搖晃。",
+                    color: "bg-red-500",
+                    stress: 100,
+                    highlight: "主要滑動通常在數秒至數十秒內完成，釋放出巨大的動能。"
+                },
+                {
+                    title: "震後期 (Postseismic Phase)",
+                    desc: "大地震結束後的應力重新分布與平衡調整階段。震源區周圍的地殼會逐漸調適新的應力狀態，其特徵為大量的「餘震 (Aftershocks)」頻繁發生，以及斷層深處無輻射地震波的緩慢滑移（稱為暫態餘滑 Afterslip），或地底孔隙流體的擴散流動。",
+                    color: "bg-green-500",
+                    stress: 15,
+                    highlight: "震後期形變可能持續數週至數年，使區域地殼應力逐漸過渡到下一次震間期循環。"
+                }
+            ];
+
+            useMathJax([activeStage]);
+
+            return (
+                <div className="space-y-8 animate-fade-in">
+                    <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+                        <h3 className="text-2xl font-bold text-teal-400 mb-4 flex items-center gap-2">
+                            <Activity size={28} /> 什麼是彈性回跳理論？ (Elastic Rebound Theory)
+                        </h3>
+                        <p className="text-slate-300 leading-relaxed mb-6 text-base md:text-lg">
+                            由地球物理學家 <strong>H. F. Reid</strong> 於 1906 年舊金山大地震後提出。這是現代地震學解析構造地震起因的最核心理論。
+                        </p>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-slate-900 p-5 rounded-xl border border-slate-700 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1.5 h-full bg-teal-500"></div>
+                                <h4 className="text-teal-300 font-bold mb-2 text-lg">1. 應力累積與形變 (Stress Accumulation)</h4>
+                                <p className="text-sm text-slate-400 leading-relaxed">
+                                    構造板塊移動時，斷層兩側岩層受強大靜摩擦力阻擋而「鎖固」無法動彈。這使斷層附近的岩體發生緩慢的彈性形變，能量就像拉伸的橡皮筋一樣累積，兩側地體逐漸向相反方向彎曲。
+                                </p>
+                            </div>
+                            <div className="bg-slate-900 p-5 rounded-xl border border-slate-700 relative overflow-hidden">
+                                <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500"></div>
+                                <h4 className="text-blue-300 font-bold mb-2 text-lg">2. 破裂與應變釋放 (Rebound & Release)</h4>
+                                <p className="text-sm text-slate-400 leading-relaxed">
+                                    當應力超越岩層臨界強度時，斷層瞬間脆性破裂並產生快速錯動。岩體隨即猛烈「回跳」至低應變狀態（僅部分釋放，仍有殘留應力），並將釋放的彈性應變能轉化為震波釋出。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                            <h3 className="text-xl font-bold text-orange-400 flex items-center gap-2">
+                                <RotateCcw size={24} /> 構造地震週期 (Seismic Cycle)
+                            </h3>
+                            <span className="text-xs bg-slate-700 text-slate-300 px-3 py-1 rounded-full">點擊 1 ~ 4 步驟查看應力變化與階段說明</span>
+                        </div>
+                        
+                        <div className="relative flex justify-between items-center mb-10 px-6">
+                            <div className="absolute left-6 right-6 h-1 bg-slate-700 top-1/2 -translate-y-1/2 z-0"></div>
+                            {stages.map((stage, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => setActiveStage(idx)}
+                                    className={`relative z-10 w-12 h-12 rounded-full flex items-center justify-center font-bold transition-all duration-300 ${
+                                        activeStage === idx 
+                                            ? `${stage.color} text-white scale-125 shadow-lg ring-4 ring-slate-800` 
+                                            : 'bg-slate-900 text-slate-400 hover:bg-slate-700 border border-slate-700'
+                                    }`}
+                                >
+                                    <span>{idx + 1}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            <div className="lg:col-span-7 p-5 bg-slate-900 rounded-xl border border-slate-700 flex flex-col justify-between">
+                                <div>
+                                    <span className={`text-xs px-2.5 py-1 rounded-full font-bold uppercase ${activeStage === 2 ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-slate-800 text-slate-300'}`}>
+                                        Stage {activeStage + 1}
+                                    </span>
+                                    <h4 className="text-xl font-bold mt-3 mb-3 text-slate-100">{stages[activeStage].title}</h4>
+                                    <p className="text-slate-300 text-sm leading-relaxed mb-4">{stages[activeStage].desc}</p>
+                                </div>
+                                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-xs text-orange-400 font-medium">
+                                    💡 關鍵地質意涵：{stages[activeStage].highlight}
+                                </div>
+                            </div>
+
+                            <div className="lg:col-span-5 bg-slate-900 rounded-xl border border-slate-700 p-5 flex flex-col justify-center">
+                                <div className="flex justify-between text-sm text-slate-400 mb-3 font-semibold">
+                                    <span>地殼累積彈性應力能</span>
+                                    <span className={activeStage === 2 ? 'text-red-400 animate-pulse' : 'text-slate-200'}>
+                                        {stages[activeStage].stress}% {activeStage === 2 && " (臨界破裂)"}
+                                    </span>
+                                </div>
+                                <div className="w-full bg-slate-950 h-5 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                                    <div className={`h-full rounded-full transition-all duration-1000 ${stages[activeStage].color}`} style={{ width: `${stages[activeStage].stress}%` }}></div>
+                                </div>
+                                <div className="mt-6 space-y-3 text-xs text-slate-400">
+                                    <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                                        <span>板塊運動狀態:</span> <span className="text-slate-200">持續穩定推擠</span>
+                                    </div>
+                                    <div className="flex justify-between border-b border-slate-800 pb-1.5">
+                                        <span>觀測指標:</span> <span className="text-slate-200">地表應變率、微震活動</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>應力釋放速率:</span> <span className="text-slate-200">{activeStage === 2 ? "瞬間 (秒級釋放)" : activeStage === 3 ? "緩慢鬆弛 (餘滑)" : "極其微弱"}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. 斷層幾何與類型
+        const FaultSection = () => {
+            const [faultType, setFaultType] = useState('normal');
+
+            const getBlockStyle = (type, isHangingWall) => {
+                const baseStyle = { transition: 'transform 1s cubic-bezier(0.4, 0, 0.2, 1)' };
+                if (type === 'normal') {
+                    return isHangingWall ? { ...baseStyle, transform: 'translate(10px, 18px)' } : baseStyle;
+                } else if (type === 'reverse') {
+                    return isHangingWall ? { ...baseStyle, transform: 'translate(-10px, -18px)' } : baseStyle;
+                } else if (type === 'strike-slip') {
+                    return isHangingWall ? { ...baseStyle, transform: 'translate(0px, 0px) scale(0.95)' } : { ...baseStyle, transform: 'translate(12px, 0px) scale(1.05)' };
+                }
+                return baseStyle;
+            };
+
+            useMathJax([faultType]);
+
+            return (
+                <div className="space-y-8 animate-fade-in">
+                    <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+                        <h3 className="text-xl font-bold text-blue-400 mb-4 flex items-center gap-2">
+                            <Box size={24} /> 斷層幾何參數 (Fault Geometry)
+                        </h3>
+                        <p className="text-sm text-slate-300 mb-4 leading-relaxed">
+                            描述一個理想的三維空間平面斷層，定義了三個最主要的角度參數：
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 border-t-4 border-t-blue-500">
+                                <h4 className="font-bold text-slate-100 mb-2 flex justify-between items-center">
+                                    <span>走向 (Strike, $\phi_f$)</span> <span className="text-xs text-blue-400 font-mono">0° ~ 360°</span>
+                                </h4>
+                                <p className="text-slate-400 leading-relaxed">斷層面與水平地面交線的方向。夾角是以正北方為起點（$0^\circ$）順時針旋轉的角度。</p>
+                            </div>
+                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 border-t-4 border-t-purple-500">
+                                <h4 className="font-bold text-slate-100 mb-2 flex justify-between items-center">
+                                    <span>傾角 (Dip, $\delta$)</span> <span className="text-xs text-purple-400 font-mono">0° ~ 90°</span>
+                                </h4>
+                                <p className="text-slate-400 leading-relaxed">斷層面與水平面之間的最大垂直夾角。傾角越小表示斷層面越平緩。</p>
+                            </div>
+                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 border-t-4 border-t-pink-500">
+                                <h4 className="font-bold text-slate-100 mb-2 flex justify-between items-center">
+                                    <span>滑移角 (Rake, $\lambda$)</span> <span className="text-xs text-pink-400 font-mono">-180° ~ 180°</span>
+                                </h4>
+                                <p className="text-slate-400 leading-relaxed">在上盤滑動方向上，上盤相對於下盤在斷層面滑移運動的相對角度。</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+                        <h3 className="text-xl font-bold text-green-400 mb-6 flex items-center gap-2">
+                            <Layers size={24} /> 三大基本斷層類型互動模擬
+                        </h3>
+                        
+                        <div className="flex flex-col lg:flex-row gap-8">
+                            <div className="flex flex-col gap-4 w-full lg:w-1/3">
+                                <button 
+                                    onClick={() => setFaultType('normal')}
+                                    className={`p-4 rounded-xl text-left border-l-4 transition-all ${faultType === 'normal' ? 'bg-green-950/40 border-l-green-500 border-slate-700 shadow-lg' : 'bg-slate-700/50 hover:bg-slate-700 border-slate-600'}`}
+                                >
+                                    <div className="font-bold text-lg text-green-400">正斷層 (Normal Fault)</div>
+                                    <div className="text-xs font-mono mt-1 text-slate-300">$\lambda \approx -90^\circ$ | 上盤相對向下滑動</div>
+                                    <div className="text-xs text-slate-400 mt-2">受張力（Tension）拉伸作用引起，多發生在板塊張裂邊界（如裂谷）。</div>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => setFaultType('reverse')}
+                                    className={`p-4 rounded-xl text-left border-l-4 transition-all ${faultType === 'reverse' ? 'bg-red-950/40 border-l-red-500 border-slate-700 shadow-lg' : 'bg-slate-700/50 hover:bg-slate-700 border-slate-600'}`}
+                                >
+                                    <div className="font-bold text-lg text-red-400">逆衝斷層 (Thrust/Reverse Fault)</div>
+                                    <div className="text-xs font-mono mt-1 text-slate-300">$\lambda \approx 90^\circ$ | 上盤相對向上推擠</div>
+                                    <div className="text-xs text-slate-400 mt-2">受擠壓力（Compression）壓縮引起。多發生於聚合板塊邊界（如造山帶）。</div>
+                                </button>
+
+                                <button 
+                                    onClick={() => setFaultType('strike-slip')}
+                                    className={`p-4 rounded-xl text-left border-l-4 transition-all ${faultType === 'strike-slip' ? 'bg-yellow-950/40 border-l-yellow-500 border-slate-700 shadow-lg' : 'bg-slate-700/50 hover:bg-slate-700 border-slate-600'}`}
+                                >
+                                    <div className="font-bold text-lg text-yellow-400">平移斷層 (Strike-slip Fault)</div>
+                                    <div className="text-xs font-mono mt-1 text-slate-300">右移 $\lambda \approx 0^\circ$ | 左移 $\lambda \approx 180^\circ$</div>
+                                    <div className="text-xs text-slate-400 mt-2">兩側地殼發生水平剪切（Shear）錯動。塊體橫向水平滑動。</div>
+                                </button>
+                            </div>
+
+                            <div className="w-full lg:w-2/3 bg-slate-900 rounded-xl border border-slate-700 p-6 flex flex-col items-center justify-center min-h-[350px] relative">
+                                <svg viewBox="0 0 200 150" className="w-full max-w-sm drop-shadow-2xl">
+                                    <defs>
+                                        <pattern id="soil-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                                            <circle cx="2" cy="2" r="1" fill="rgba(255,255,255,0.08)"></circle>
+                                        </pattern>
+                                        <linearGradient id="left-block-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" stopColor="#854d0e" /><stop offset="100%" stopColor="#422006" />
+                                        </linearGradient>
+                                        <linearGradient id="right-block-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                            <stop offset="0%" stopColor="#9a3412" /><stop offset="100%" stopColor="#431407" />
+                                        </linearGradient>
+                                    </defs>
+
+                                    <line x1="120" y1="20" x2="60" y2="130" stroke="#475569" strokeWidth="2" strokeDasharray="4,4" />
+
+                                    <g style={getBlockStyle(faultType, false)}>
+                                        <polygon points="10,20 120,20 60,130 10,130" fill="url(#left-block-grad)" stroke="#0f172a" strokeWidth="1"/>
+                                        <polygon points="10,20 120,20 60,130 10,130" fill="url(#soil-pattern)" />
+                                        <text x="35" y="80" fill="#f1f5f9" fontSize="11" fontWeight="bold">下盤 (Footwall)</text>
+                                    </g>
+
+                                    <g style={getBlockStyle(faultType, true)}>
+                                        <polygon points="122,20 190,20 190,130 62,130" fill="url(#right-block-grad)" stroke="#0f172a" strokeWidth="1"/>
+                                        <polygon points="122,20 190,20 190,130 62,130" fill="url(#soil-pattern)" />
+                                        <text x="122" y="80" fill="#f1f5f9" fontSize="11" fontWeight="bold">上盤 (Hangingwall)</text>
+                                    </g>
+                                </svg>
+                                
+                                <div className="mt-4 p-4 bg-slate-950/60 rounded-lg border border-slate-800 text-center text-xs text-slate-300 w-full max-w-md">
+                                    {faultType === 'normal' && '【張拉效應】上盤因重力向下滑落，導致該區域地殼水平長度拉長。'}
+                                    {faultType === 'reverse' && '【壓縮推擠】上盤受力向上推擠起伏，導致地殼水平長度縮短、地表隆起。'}
+                                    {faultType === 'strike-slip' && '【水平剪切】主要受水平方向剪切力錯動。塊體側向滑動，地表形成錯裂。'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // 3. 震源機制與力學
+        const MechanicsSection = () => {
+            const [mu, setMu] = useState(30); // 剪切模數 GPa
+            const [slip, setSlip] = useState(2.0); // 滑移量 m
+            const [area, setArea] = useState(500); // 斷層面積 km^2
+
+            const calculateMagnitude = () => {
+                // M0 = mu * A * D
+                // mu: Pa, A: m^2, slip: m
+                const muPa = mu * 1e9;
+                const areaM2 = area * 1e6;
+                const M0 = muPa * areaM2 * slip;
+                const Mw = (2 / 3) * Math.log10(M0) - 6.07;
+                return { M0, Mw };
+            };
+
+            const { M0, Mw } = calculateMagnitude();
+
+            useMathJax([mu, slip, area]);
+
+            return (
+                <div className="space-y-8 animate-fade-in">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Section A: Concept explain */}
+                        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700 space-y-4">
+                            <h3 className="text-xl font-bold text-pink-400 flex items-center gap-2">
+                                <Target size={24} /> 震源機制解與沙灘球判讀
+                            </h3>
+                            
+                            <div className="space-y-4 text-sm">
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-pink-500"></div>
+                                    <h4 className="font-bold text-slate-200 mb-1">P波初動極性 (P-wave First Motion)</h4>
+                                    <p className="text-slate-400 leading-relaxed">
+                                        地震波初動是指地震波到達測站時最初的偏折方向。
+                                    </p>
+                                    <ul className="text-xs text-slate-400 mt-2 list-disc list-inside space-y-1">
+                                        <li><strong className="text-slate-200">壓縮 (Compression)：</strong>初動波形向上，在投影球中以<span className="text-red-400 font-semibold">黑色/著色</span>標示（代表應力受擠壓）。</li>
+                                        <li><strong className="text-slate-200">擴張 (Dilatation)：</strong>初動波形向下，在投影球中以<span className="text-blue-400 font-semibold">白色</span>標示（代表應力受拉張）。</li>
+                                    </ul>
+                                </div>
+
+                                <div className="bg-slate-900 p-4 rounded-xl border border-slate-700 relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-500"></div>
+                                    <h4 className="font-bold text-slate-200 mb-1">節面 (Nodal Planes)</h4>
+                                    <p className="text-slate-400 leading-relaxed">
+                                        沙灘球上的黑白邊界線由兩個垂直相交的平面構成，稱為**節面**。其中一個代表**真實斷層面**，另一個則是**輔助面**。僅由地震波初動無法區分兩者，須結合地質與餘震分佈。
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Section B: Stereographic Beachball Details */}
+                        <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700 flex flex-col justify-between">
+                            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                                <Globe size={24} /> 典型沙灘球與震源受力型態
+                            </h3>
+                            
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                    <svg viewBox="0 0 100 100" className="w-16 h-16 mx-auto mb-2">
+                                        <circle cx="50" cy="50" r="45" fill="white" stroke="#64748b" strokeWidth="2"/>
+                                        <path d="M 50,5 A 45,45 0 0,1 95,50 A 45,45 0 0,1 50,95 A 45,45 0 0,1 5,50 A 45,45 0 0,1 50,5" fill="#38bdf8"/>
+                                        <circle cx="50" cy="50" r="45" fill="none" stroke="#64748b" strokeWidth="2"/>
+                                        <path d="M 50,5 A 32,45 0 0,1 50,95 A 32,45 0 0,0 50,5" fill="white"/>
+                                    </svg>
+                                    <span className="text-xs font-bold block text-sky-400">正斷層型</span>
+                                    <span className="text-[10px] text-slate-400 block mt-1">中間為白，兩側為色</span>
+                                </div>
+                                <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                    <svg viewBox="0 0 100 100" className="w-16 h-16 mx-auto mb-2">
+                                        <circle cx="50" cy="50" r="45" fill="white" stroke="#64748b" strokeWidth="2"/>
+                                        <path d="M 50,5 A 32,45 0 0,1 50,95 A 32,45 0 0,0 50,5" fill="#f43f5e"/>
+                                    </svg>
+                                    <span className="text-xs font-bold block text-rose-400">逆衝斷層型</span>
+                                    <span className="text-[10px] text-slate-400 block mt-1">中間為色，兩側為白</span>
+                                </div>
+                                <div className="bg-slate-900 p-3 rounded-xl border border-slate-700">
+                                    <svg viewBox="0 0 100 100" className="w-16 h-16 mx-auto mb-2">
+                                        <circle cx="50" cy="50" r="45" fill="white" stroke="#64748b" strokeWidth="2"/>
+                                        <path d="M 50,5 A 45,45 0 0,1 95,50 L 50,50 Z" fill="#eab308"/>
+                                        <path d="M 50,95 A 45,45 0 0,1 5,50 L 50,50 Z" fill="#eab308"/>
+                                    </svg>
+                                    <span className="text-xs font-bold block text-yellow-400">平移斷層型</span>
+                                    <span className="text-[10px] text-slate-400 block mt-1">十字形黑白相間花紋</span>
+                                </div>
+                            </div>
+                            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs text-slate-400 mt-4">
+                                💡 判讀技巧：著色區域代表主應力中的張裂軸（T軸）投影方向，白色中央代表壓縮軸（P軸）垂直往下推。
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section C: Math & Live Simulator */}
+                    <div className="bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-700">
+                        <h3 className="text-xl font-bold text-teal-400 mb-4 flex items-center gap-2">
+                            <Sliders size={24} /> 地震矩力學與規模計算模擬器
+                        </h3>
+                        <p className="text-sm text-slate-300 mb-6 leading-relaxed">
+                            動態調整滑桿參數，計算斷層破裂產生的**地震矩 ($M_0$)** 與絕對能量度量的**地震矩規模 ($Mw$)**：
+                        </p>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            {/* Sliders Input */}
+                            <div className="lg:col-span-6 space-y-5">
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="font-semibold text-slate-300">地殼地層剪切模數 ($\mu$)</span>
+                                        <span className="text-teal-400 font-mono font-bold">{mu} GPa</span>
+                                    </div>
+                                    <input type="range" min="10" max="60" value={mu} onChange={(e) => setMu(Number(e.target.value))} className="w-full h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-teal-500" />
+                                    <span className="text-[11px] text-slate-500 block">常態地殼介質約為 30 GPa，地函深處可達 50 GPa 以上。</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="font-semibold text-slate-300">斷層面平均破裂滑移量 ($D$)</span>
+                                        <span className="text-purple-400 font-mono font-bold">{slip.toFixed(1)} 公尺</span>
+                                    </div>
+                                    <input type="range" min="0.5" max="15" step="0.5" value={slip} onChange={(e) => setSlip(Number(e.target.value))} className="w-full h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-purple-500" />
+                                    <span className="text-[11px] text-slate-500 block">大地震的斷層錯動位移通常達數公尺至十數公尺。</span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="font-semibold text-slate-300">斷層破裂面總面積 ($A$)</span>
+                                        <span className="text-pink-400 font-mono font-bold">{area} $km^2$</span>
+                                    </div>
+                                    <input type="range" min="10" max="2500" step="10" value={area} onChange={(e) => setArea(Number(e.target.value))} className="w-full h-2 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-pink-500" />
+                                    <span className="text-[11px] text-slate-500 block">破裂面積等於破裂長度乘上地下破裂寬度（深度延伸）。</span>
+                                </div>
+                            </div>
+
+                            {/* Result Output Display */}
+                            <div className="lg:col-span-6 bg-slate-950 p-6 rounded-xl border border-slate-700 flex flex-col justify-between">
+                                <div className="space-y-4">
+                                    <div className="border-b border-slate-800 pb-3">
+                                        <span className="text-xs text-slate-500 uppercase block font-bold">總釋放物理地震矩 (Seismic Moment)</span>
+                                        <div className="text-xl md:text-2xl font-mono font-bold text-slate-200 mt-1">
+                                            $M_0 = {M0.toExponential(3)}\text{ N}\cdot\text{m}$
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <span className="text-xs text-orange-400 uppercase block font-bold">導出地震矩規模 (Moment Magnitude)</span>
+                                        <div className="text-4xl md:text-5xl font-mono font-extrabold text-orange-400 mt-2 flex items-baseline gap-2">
+                                            $M_w$ {Mw.toFixed(2)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 text-xs text-slate-400 space-y-2 bg-slate-900 p-4 rounded-lg border border-slate-800">
+                                    <p className="font-bold text-slate-300">💡 理論公式依據：</p>
+                                    <p>1. 地震矩：$M_0 = \mu \cdot A \cdot D$（單位為牛頓·米）</p>
+                                    <p>2. 規模公式：$M_w = \frac{2}{3} \log_{10}(M_0) - 6.07$</p>
+                                    <p className="text-slate-500 mt-1">規模每增加 1.0，釋放的物理能量將激增約 31.6 倍。這也是為什麼大地震造成的破壞呈指數型暴增。</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- Main App Entry ---
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('theory');
+
+            return (
+                <div className="min-h-screen bg-slate-950 text-slate-100 font-sans">
+                    {/* Header */}
+                    <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-md">
+                        <div className="max-w-6xl mx-auto px-4 py-4 md:py-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-teal-500/10 p-2 rounded-xl border border-teal-500/30 text-teal-400">
+                                    <Activity size={32} />
+                                </div>
+                                <div>
+                                    <h1 className="text-xl md:text-2xl font-black bg-gradient-to-r bg-clip-text text-transparent from-teal-400 to-blue-500">
+                                        地震週期與斷層力學
+                                    </h1>
+                                    <p className="text-xs text-slate-400 font-medium">進階地球物理學互動式數位學習指南</p>
+                                </div>
+                            </div>
+
+                            {/* Tabs Control */}
+                            <nav className="flex space-x-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                                <button 
+                                    onClick={() => setActiveTab('theory')}
+                                    className={`px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all ${activeTab === 'theory' ? 'bg-slate-800 text-teal-400 shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                                >
+                                    應力與地震週期
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('fault')}
+                                    className={`px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all ${activeTab === 'fault' ? 'bg-slate-800 text-blue-400 shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                                >
+                                    斷層幾何類型
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('mechanics')}
+                                    className={`px-4 py-2 rounded-lg text-xs md:text-sm font-bold transition-all ${activeTab === 'mechanics' ? 'bg-slate-800 text-pink-400 shadow' : 'text-slate-400 hover:text-slate-200'}`}
+                                >
+                                    震源機制與力學
+                                </button>
+                            </nav>
+                        </div>
+                    </header>
+
+                    {/* Content Body Container */}
+                    <main className="max-w-6xl mx-auto px-4 py-8">
+                        {activeTab === 'theory' && <TheorySection />}
+                        {activeTab === 'fault' && <FaultSection />}
+                        {activeTab === 'mechanics' && <MechanicsSection />}
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="border-t border-slate-900 py-6 mt-12 text-center text-xs text-slate-600 font-mono">
+                        Seismology & Fault Mechanics Interactive Guide © 2026
+                    </footer>
+                </div>
+            );
+        };
+
+        // Render App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
