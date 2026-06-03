@@ -74,9 +74,14 @@
         // --- MathJax Re-Typeset Hook ---
         const useMathJax = (dependencies) => {
             useEffect(() => {
-                if (window.MathJax && window.MathJax.typesetPromise) {
-                    window.MathJax.typesetPromise().catch((err) => console.log('MathJax rendering failed: ', err));
-                }
+                const typeset = () => {
+                    if (window.MathJax && window.MathJax.typesetPromise) {
+                        window.MathJax.typesetPromise().catch((err) => console.log('MathJax rendering failed: ', err));
+                    }
+                };
+                typeset();
+                const timer = setTimeout(typeset, 300); // 延遲容錯，防止異步加載時公式渲染缺失
+                return () => clearTimeout(timer);
             }, dependencies);
         };
 
@@ -349,7 +354,6 @@
                   </div>
 
                   <div className="w-full lg:w-2/3 bg-slate-900 rounded-xl border border-slate-700 p-6 flex flex-col items-center justify-center min-h-[350px] overflow-hidden relative">
-                    {/* SVG Block Visualization */}
                     <svg viewBox="0 0 200 150" className="w-full max-w-sm drop-shadow-2xl">
                       <defs>
                         <pattern id="soil-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -368,21 +372,18 @@
 
                       <line x1="120" y1="20" x2="60" y2="130" stroke="#475569" strokeWidth="2" strokeDasharray="4,4" />
 
-                      {/* Footwall Block */}
                       <g style={getBlockStyle(faultType, false)}>
                         <polygon points="10,20 120,20 60,130 10,130" fill="url(#left-block-grad)" stroke="#0f172a" strokeWidth="1"/>
                         <polygon points="10,20 120,20 60,130 10,130" fill="url(#soil-pattern)" />
                         <text x="35" y="80" fill="#f1f5f9" fontSize="11" fontWeight="bold" fontFamily="sans-serif">下盤 (Footwall)</text>
                       </g>
 
-                      {/* Hanging wall Block */}
                       <g style={getBlockStyle(faultType, true)}>
                         <polygon points="122,20 190,20 190,130 62,130" fill="url(#right-block-grad)" stroke="#0f172a" strokeWidth="1"/>
                         <polygon points="122,20 190,20 190,130 62,130" fill="url(#soil-pattern)" />
                         <text x="128" y="80" fill="#f1f5f9" fontSize="11" fontWeight="bold" fontFamily="sans-serif">上盤 (Hanging)</text>
                       </g>
 
-                      {/* Dynamic Stress Arrows */}
                       {faultType === 'normal' && (
                         <g stroke="#22c55e" strokeWidth="2.5" fill="none">
                           <path d="M 5,75 L -15,75 M -5,65 L -15,75 L -5,85" />
@@ -678,7 +679,7 @@
                       <div className={`text-6xl md:text-7xl font-extrabold font-mono transition-colors duration-300 ${
                         Mw >= 7 ? 'text-red-500 shadow-red-950/30' : Mw >= 6 ? 'text-orange-500' : 'text-teal-400'
                       }`}>
-                        {Mw}
+                        {Number(Mw).toFixed(2)}
                       </div>
                       <p className="text-[11px] text-slate-500 mt-4 max-w-[280px] mx-auto leading-relaxed">
                         與早期飽和的震級計量不同，地震矩規模能精確量度至規模 $9.0+$ 以上特大型巨震能量。
