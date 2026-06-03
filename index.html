@@ -11,12 +11,16 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- MathJax for Beautiful LaTeX rendering -->
+    <!-- MathJax Configuration -->
     <script>
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            options: {
+                // 忽略對 React 根節點外部的渲染，避免干擾
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
             },
             svg: {
                 fontCache: 'global'
@@ -45,6 +49,15 @@
     </script>
     <style>
         body { margin: 0; padding: 0; background-color: #020617; }
+        
+        /* 💡 核心修正：防止 Tailwind Preflight 破壞 MathJax 內部的邊框與排版 */
+        .mjx-chtml, .mjx-math, mjx-container, mjx-container * {
+            box-sizing: content-box !important;
+            border-width: initial !important;
+            border-style: initial !important;
+            border-color: initial !important;
+        }
+
         /* Smooth transition for range sliders */
         input[type="range"]::-webkit-slider-thumb {
             transition: transform 0.1s ease;
@@ -76,11 +89,12 @@
             useEffect(() => {
                 const typeset = () => {
                     if (window.MathJax && window.MathJax.typesetPromise) {
-                        window.MathJax.typesetPromise().catch((err) => console.log('MathJax rendering failed: ', err));
+                        window.MathJax.typesetPromise()
+                            .catch((err) => console.log('MathJax rendering failed: ', err));
                     }
                 };
                 typeset();
-                const timer = setTimeout(typeset, 300); // 延遲容錯，防止異步加載時公式渲染缺失
+                const timer = setTimeout(typeset, 200); 
                 return () => clearTimeout(timer);
             }, dependencies);
         };
